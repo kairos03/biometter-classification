@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 from scipy import ndimage
+import matplotlib.pyplot as plt
 
 # data path
 raw_path = './raw_data'
@@ -72,16 +73,58 @@ def integrated_data_set(to_csv=False, to_pickle=False):
     return data_set
 
 
-def read_data():
+def make_train_and_test_set(test_ratio=0.2, to_pickle=False):
+    data = read_whole_data()
+
+    # shuffle
+    data = data.sample(frac=1)
+
+    # separate set
+    pivot = int(data.shape[0] * test_ratio)
+
+    train, test = data[pivot:], data[:pivot]
+
+    if to_pickle:
+        train.to_pickle(data_path+'/train_input_data.pkl', compression='gzip')
+        test.to_pickle(data_path+'/test_input_data.pkl', compression='gzip')
+
+    return train, test
+
+
+def read_whole_data():
     return pd.read_pickle(data_path+'/input_data.pkl', compression='gzip')
 
 
+def read_train_and_test_data():
+    train = pd.read_pickle(data_path+'/train_input_data.pkl', compression='gzip')
+    test = pd.read_pickle(data_path+'/test_input_data.pkl', compression='gzip')
+    return train, test
+
+
 def main():
-    data_set = integrated_data_set(to_pickle=True)
+    pass
+    # save data set to pickle
+    # data_set = integrated_data_set(to_pickle=True)
 
-    # print(data_set['image'][0])
+    # read whole data set
+    # data_set = read_whole_data()
 
-    print(data_set)
+    # sample image plot
+    # for i in [0, 600]:
+    #     sample = data_set['image'][i]
+    #     data = np.reshape(sample[0], (640, 512))
+    #
+    #     plt.imshow(data)
+    #     plt.show()
+
+    # make train, test set
+    # train, test = make_train_and_test_set(to_pickle=True)
+
+    # read train, test set
+    # train, test = read_train_and_test_data()
+    #
+    # print(train.head())
+    # print(test.head())
 
 
 if __name__ == '__main__':
