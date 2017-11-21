@@ -5,14 +5,14 @@ import time
 from data import input_data
 import numpy as np
 
-learning_rate = 1e-3
+learning_rate = 1e-4
 total_epoch = 100
-batch_size = 30
+batch_size = 10
 dropout_keep_prob = 0.9
 
-name = 'lr_{}_{}'.format(learning_rate, time.time())
+name = 'lr_{}_epoch_{}_batch_{}_{}'.format(learning_rate, total_epoch, batch_size, time.time())
 log_root = './log/' + name + '/'
-model_root = './model/' + name + '_'
+model_root = './model/' + name + '/'
 
 train_data, test_data = input_data.read_train_and_test_data()
 
@@ -153,7 +153,7 @@ def train():
                 total_loss += loss
 
             train_log.add_summary(summary, epoch)
-            print('epoch: {}, loss: {}'.format(epoch, total_loss / total_batch))
+            print('epoch: {}, loss: {:.4}'.format(epoch, total_loss / total_batch))
 
             if epoch % 5 == 0:
                 xs, ys = next_batch(batch, False)
@@ -165,9 +165,9 @@ def train():
                                             keep_prob: 1})
 
                 test_log.add_summary(summary, epoch)
-                saver.save(sess, model_root+'/acc_{}'.format(acc))
-                print('accuracy: {}'.format(acc))
+                print('accuracy: {:.4}'.format(acc))
 
+        saver.save(sess, model_root+'acc_{:.4}'.format(acc))
     print('Finish')
     train_log.close()
 
