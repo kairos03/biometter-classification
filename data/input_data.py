@@ -55,6 +55,7 @@ def integrated_data_set(to_csv=False, to_pickle=False):
         print(type(x))
         print(x)
 
+    # images = np.transpose(images, (0, 2, 1))
     images = [x for x in images]
     print(type(images[0]))
     print(images[0])
@@ -97,7 +98,9 @@ def read_whole_data():
 
 def read_train_and_test_data():
     train = pd.read_pickle(data_path+'/train_input_data.pkl', compression='gzip')
+    train = train.to_dict('list')
     test = pd.read_pickle(data_path+'/test_input_data.pkl', compression='gzip')
+    test = test.to_dict('list')
     return train, test
 
 
