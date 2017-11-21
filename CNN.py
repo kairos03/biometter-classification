@@ -9,9 +9,6 @@ import data.input_data as readdata
 import time
 import numpy as np
 
-SAVE='D:/KIST/tmp/train/model/ckpt'
-LOG='D:/KIST/tmp/train/log/'
-
 # checkpoint : tf.summary 클래스 input으로 object를 넣어야 하는 이유?
 class Summary(object):
     """ Design Tensorboard about CNN
@@ -54,8 +51,8 @@ class ConvLayer(Summary):
         self.w = tf.Variable(tf.truncated_normal(W_shape, stddev=0.1), trainable=True, name='W')
         self._summary('W', self.w)
 
-        if self.act != 'bn':
-            self.B = tf.Variable(tf.constant())
+        # if self.act != 'bn':
+        #    self.B = tf.Variable(tf.constant())
 
     def out(self):
         # basic output
@@ -198,10 +195,10 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
     start = time.time()
 
     # shape of train, test : [total_num, kernel_num, col_size, row_size]
-    n_train = train[0]
-    n_test = test[0]
+    n_train = len(train['image'])
+    #  n_test = test[0]
 
-    with tf.variable_scope("input data"):
+    with tf.variable_scope("inputdata"):
         # input : 640*512 pix image, black&white
         # output : 1 = separate, 0 = contact
         _X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='_X')
@@ -255,6 +252,53 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
                 if step > MAX_EPOCH: break
     print('-----  training end  -----')
 
+# test session
+def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
+    start = time.time()
+
+    # shape of train, test : [total_num, kernel_num, col_size, row_size]
+    n_test = len(test['image'])
+
+    with tf.variable_scope("input data"):
+        # input : 640*512 pix image, black&white
+        # output : 1 = separate, 0 = contact
+        _X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='_X')
+        _Y = tf.placeholder(tf.float32, [None, 2], name='_Y')
+
+        # load inference model
+        Y, cross_entropy, accuracy, _ = cnn_model(_X, _Y)
+
+    with tf.variable_scope('Metrics'):
+        tf.summary.scalar('accuracy', accuracy)
+        tf.summary.scalar('cross_entropy', cross_entropy)
+
+        # set tensorboard summary and saver
+        merged = tf.summary.merge_all()
+        saver = tf.train.Saver(max_to_keep=100)
+
+    print('----- test start -----')
+    with tf.Session() as sess:
+        sum_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
+        tf.global_variables_initializer().run() # .run() is possible! because of with tf.Session()
+        step = 1
+        saver.restore(sess, SAVE_MODEL_PATH)
+        avg_acc = 0
+
+
+        for step in range(int(n_test / BATCH_SIZE) + 1):
+            # checkpoint
+            s = step * BATCH_SIZE
+            e = (step + 1) * BATCH_SIZE if (step + 1) * BATCH_SIZE < n_test else n_test
+            # batch_xs, batch_ys = next_batch(n_test)
+            if e <= s: break
+            summary, acc, ent = sess.run([merged, accuracy, cross_entropy],
+                                            {_X: n_test['image'][s:e], _Y:  n_test['is_contacted'][s:e]})
+            sum_writer.add_summary(summary, step)
+            avg_acc += acc*(e-s)
+            print(' step:%3d, size:%3d, accuracy:%f, cross entropy:%f'
+                  % (step, e - s, acc, ent))
+
+    print('-----  test end  -----')
 
 
 # kernel depths
@@ -268,6 +312,11 @@ batch_size = 60
 
 # do train with batch size 60 and maximum step 50
 train, test = readdata.make_train_and_test_set()
+SAVE='/home/mike2ox/biometter-classification/train/model/ckpt'
+LOG='/home/mike2ox/biometter-classification/train/log/'
 phase_train(max_epoch, batch_size, SAVE, LOG)
 
+MODEL='/home/mike2ox/biometter-classification/test/model/ckpt'
+LOG='/home/mike2ox/biometter-classification/test/log'
+phase_test(100,MODEL,LOG)
 
