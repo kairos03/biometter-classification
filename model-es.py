@@ -10,7 +10,9 @@ total_epoch = 100
 batch_size = 30
 dropout_keep_prob = 0.9
 
-log_root = './log/lr_{}_{}/'.format(learning_rate, time.time())
+name = 'lr_{}_{}'.format(learning_rate, time.time())
+log_root = './log/' + name + '/'
+model_root = './model/' + name + '_'
 
 train_data, test_data = input_data.read_train_and_test_data()
 
@@ -128,6 +130,7 @@ def train():
     train_log = tf.summary.FileWriter(log_root+'train'.format(learning_rate, time.time()))
     test_log = tf.summary.FileWriter(log_root+'test'.format(learning_rate, time.time()))
     merged = tf.summary.merge_all()
+    saver = tf.train.Saver()
 
     with tf.Session() as sess:
         tf.global_variables_initializer().run()
@@ -162,6 +165,7 @@ def train():
                                             keep_prob: 1})
 
                 test_log.add_summary(summary, epoch)
+                saver.save(sess, model_root+'acc_{}'.format(acc))
                 print('accuracy: {}'.format(acc))
 
     print('Finish')
