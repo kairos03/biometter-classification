@@ -165,7 +165,7 @@ def train():
                                             keep_prob: 1})
 
                 test_log.add_summary(summary, epoch)
-                saver.save(sess, model_root+'acc_{}'.format(acc))
+                saver.save(sess, model_root+'/acc_{}'.format(acc))
                 print('accuracy: {}'.format(acc))
 
     print('Finish')
