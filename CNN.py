@@ -9,6 +9,16 @@ import data.input_data as readdata
 import time
 import numpy as np
 
+# kernel depths
+k_1 = 2
+k_2 = 4
+k_3 = 32
+f_node = 512
+
+max_epoch = 50
+batch_size = 30
+
+
 # checkpoint : tf.summary 클래스 input으로 object를 넣어야 하는 이유?
 class Summary(object):
     """ Design Tensorboard about CNN
@@ -60,7 +70,7 @@ class ConvLayer(Summary):
 
         # detect activation function
         if self.act == 'relu':
-            return tf.nn.relu(WX + self.B)
+            return tf.nn.relu(WX)
         elif self.act == 'bn':
             return WX
         elif self.act == 'none':
@@ -80,7 +90,7 @@ class FC_Layer(Summary):
         self.act = activation.lower()
 
         # calculate weight, bis
-        self.W = tf.Variable(tf.truncated_normal([n_in, n_out]), stddev=0.1, trainable=True, name='W')
+        self.W = tf.Variable(tf.truncated_normal([n_in, n_out], stddev=0.1), trainable=True, name='W')
         self._summary('W', self.W)
         self.B = tf.Variable(tf.constant(0.0, tf.float32, [n_out]), trainable=True, name='B')
         self._summary('B', self.B)
@@ -143,25 +153,25 @@ def cnn_model(image_array, result, p_keep = None):
         # 2 : front,right image data (black&white)
         # .out() -> activate ReLU function
         # kernel size define reference : http://bit.ly/2jFdBjP
-        step1 = ConvLayer(image_array, k_1, 8, 100, 100, 4, activation='ReLU').out()
+        step1 = ConvLayer(image_array, k_1, k_2, 100, 100, 4, activation='ReLU').out()
 
     with tf.name_scope('MaxPool1'):
         step1 = tf.nn.max_pool(step1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     with tf.variable_scope('Conv2'):
-        step2 = ConvLayer(step1, k_2, 64, 20, 20, 2, activation='ReLU').out()
+        step2 = ConvLayer(step1, k_2, k_3, 20, 20, 4, activation='ReLU').out()
     with tf.name_scope('MaxPool2'):
         step2 = tf.nn.max_pool(step2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     with tf.variable_scope('Conv3'):
-        step3 = ConvLayer(step2, k_3, 1024, 3, 3, 1, activation='ReLu').out()
+        step3 = ConvLayer(step2, k_3, 64, 3, 3, 2, activation='ReLU').out()
     with tf.variable_scope('output'):
-        step4 = tf.reshape(step3, [-1, 20*16*1024])
-        step5 = FC_Layer(step4, 20*16*1024, f_node, activation='ReLu').out()
+        step4 = tf.reshape(step3, [-1, 5*4*64])
+        step5 = FC_Layer(step4, 5*4*64, f_node, activation='ReLU').out()
+        Y = FC_Layer(step5, f_node, 2, activation='ReLU').out()
 
-    Y = tf.nn.softmax(step5, name='Y')
 
     # checkpoint : there need to re-customize
     with tf.variable_scope('cross_entropy'):
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=step5, labels=result)
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=Y, labels=result)
         cross_entropy = tf.reduce_mean(cross_entropy)
 
     with tf.variable_scope('accuracy'):
@@ -259,7 +269,7 @@ def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
     # shape of train, test : [total_num, kernel_num, col_size, row_size]
     n_test = len(test['image'])
 
-    with tf.variable_scope("input data"):
+    with tf.variable_scope("input_data"):
         # input : 640*512 pix image, black&white
         # output : 1 = separate, 0 = contact
         _X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='_X')
@@ -300,22 +310,11 @@ def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
 
     print('-----  test end  -----')
 
-
-# kernel depths
-k_1 = 4
-k_2 = 8
-k_3 = 16
-f_node = 512
-
-max_epoch = 50
-batch_size = 60
-
 # do train with batch size 60 and maximum step 50
-train, test = readdata.make_train_and_test_set()
+train, test = readdata.read_train_and_test_data()
 SAVE='/home/mike2ox/biometter-classification/train/model/ckpt'
 LOG='/home/mike2ox/biometter-classification/train/log/'
 phase_train(max_epoch, batch_size, SAVE, LOG)
-
 MODEL='/home/mike2ox/biometter-classification/test/model/ckpt'
 LOG='/home/mike2ox/biometter-classification/test/log'
 phase_test(100,MODEL,LOG)
