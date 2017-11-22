@@ -61,8 +61,9 @@ class ConvLayer(Summary):
         self.w = tf.Variable(tf.truncated_normal(W_shape, stddev=0.1), trainable=True, name='W')
         self._summary('W', self.w)
 
-        # if self.act != 'bn':
-        #    self.B = tf.Variable(tf.constant())
+        if self.act != 'bn':
+            self.B = tf.Variable(tf.constant(0.1, tf.float32, [ch_out]), trainable=True, name='B')
+            self._summary('B',self.B)
 
     def out(self):
         # basic output
@@ -70,7 +71,7 @@ class ConvLayer(Summary):
 
         # detect activation function
         if self.act == 'relu':
-            return tf.nn.relu(WX)
+            return tf.nn.relu(WX + self.B)
         elif self.act == 'bn':
             return WX
         elif self.act == 'none':
@@ -109,7 +110,7 @@ class batch_norm(Summary):
 
            Returns:
     """
-    def __init__(self, input_tensor, out_size, train, activation='none'):
+    def __init__(self, input_tensor, out_size, _train, activation='none'):
         self.input = input_tensor
         self.act = activation.lower()
 
@@ -122,21 +123,20 @@ class batch_norm(Summary):
         ema = tf.train.ExponentialMovingAverage(decay=0.5)
         ema_apply_op = ema.apply([batch_mean, batch_var])
 
-        if train:
-          with tf.control_dependencies([ema_apply_op]):
-            self.mean, self.var = tf.identity(batch_mean), tf.identity(batch_var)
+        if _train:
+            with tf.control_dependencies([ema_apply_op]):
+                self.mean, self.var = tf.identity(batch_mean), tf.identity(batch_var)
         else:
-          self.mean, self.var = ema.average(batch_mean), ema.average(batch_var)
-
+            self.mean, self.var = ema.average(batch_mean), ema.average(batch_var)
 
     def out(self):
         norm = tf.nn.batch_normalization(self.input, self.mean, self.var, self.beta, self.gamma, 1e-5)
         if self.act == 'relu':
-          return tf.nn.relu(norm)
+            return tf.nn.relu(norm)
         elif self.act == 'none':
-          return norm
+            return norm
         else:
-          raise ValueError('ERROR: unsupported activation option')
+            raise ValueError('ERROR: unsupported activation option')
 
 ### Create Convolution Neural Networks
 def cnn_model(image_array, result, p_keep = None):
@@ -147,6 +147,8 @@ def cnn_model(image_array, result, p_keep = None):
           Returns:
 
     """
+
+    train_step = False if p_keep is None else True
 
     # Todo : ksize have to be modified in MaxPool1,2
     with tf.variable_scope('Conv1'):
@@ -163,11 +165,13 @@ def cnn_model(image_array, result, p_keep = None):
         step2 = tf.nn.max_pool(step2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     with tf.variable_scope('Conv3'):
         step3 = ConvLayer(step2, k_3, 64, 3, 3, 2, activation='ReLU').out()
-    with tf.variable_scope('output'):
-        step4 = tf.reshape(step3, [-1, 5*4*64])
-        step5 = FC_Layer(step4, 5*4*64, f_node, activation='ReLU').out()
-        Y = FC_Layer(step5, f_node, 2, activation='ReLU').out()
+        step4 = tf.reshape(step3, [-1, 5 * 4 * 64])
 
+    with tf.variable_scope('output'):
+        step5 = FC_Layer(step4, 5*4*64, f_node, activation='ReLU').out()
+        if train_step: step5 = tf.nn.dropout(step5, p_keep)
+        step6 = FC_Layer(step5, f_node, 2, activation='ReLU').out()
+        if train_step: Y = tf.nn.dropout(step6, p_keep, name='Y')
 
     # checkpoint : there need to re-customize
     with tf.variable_scope('cross_entropy'):
@@ -208,21 +212,19 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
     n_train = len(train['image'])
     #  n_test = test[0]
 
-    with tf.variable_scope("inputdata"):
+    with tf.Graph().as_default() as train_g:
         # input : 640*512 pix image, black&white
         # output : 1 = separate, 0 = contact
         _X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='_X')
         _Y = tf.placeholder(tf.float32, [None, 2], name='_Y')
-
-    with tf.variable_scope('configure'):
-        # dropout keep probability
-        p_keep = tf.placeholder(tf.float32, name='p_keep')
-        # learning rate
-        global_step = tf.Variable(0, name='global_step', trainable=False)
-
-        # decayed LR. this code is recommended to lower the LR as the training step
-        # whenever it reach a certain step, tf will edit LR
-        LR = tf.train.exponential_decay(0.00001, global_step, int(MAX_EPOCH / 5), 0.5, staircase=True, name='LR')
+        with tf.variable_scope('configure'):
+            # dropout keep probability
+            p_keep = tf.placeholder(tf.float32, name='p_keep')
+            # learning rate
+            global_step = tf.Variable(0, name='global_step', trainable=False)
+            # decayed LR. this code is recommended to lower the LR as the training step
+            # whenever it reach a certain step, tf will edit LR
+            LR = tf.train.exponential_decay(0.001, global_step, int(MAX_EPOCH / 5), 0.5, staircase=True, name='LR')
 
         # load inference model
         Y, cross_entropy, accuracy, _ = cnn_model(_X, _Y, p_keep)
