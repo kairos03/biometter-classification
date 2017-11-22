@@ -18,7 +18,6 @@ f_node = 512
 max_epoch = 50
 batch_size = 30
 
-
 # checkpoint : tf.summary 클래스 input으로 object를 넣어야 하는 이유?
 class Summary(object):
     """ Design Tensorboard about CNN
@@ -215,8 +214,8 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
     with tf.Graph().as_default() as train_g:
         # input : 640*512 pix image, black&white
         # output : 1 = separate, 0 = contact
-        _X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='_X')
-        _Y = tf.placeholder(tf.float32, [None, 2], name='_Y')
+        X_ = tf.placeholder(tf.float32, [None, 640, 512, 2], name='X_')
+        Y_ = tf.placeholder(tf.float32, [None, 2], name='Y_')
         with tf.variable_scope('configure'):
             # dropout keep probability
             p_keep = tf.placeholder(tf.float32, name='p_keep')
@@ -227,7 +226,7 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
             LR = tf.train.exponential_decay(0.001, global_step, int(MAX_EPOCH / 5), 0.5, staircase=True, name='LR')
 
         # load inference model
-        Y, cross_entropy, accuracy, _ = cnn_model(_X, _Y, p_keep)
+        Y, cross_entropy, accuracy, _ = cnn_model(X_, Y_, p_keep)
         train_op = tf.train.AdamOptimizer(LR).minimize(cross_entropy, global_step=global_step)
 
         with tf.variable_scope('Metrics'):
@@ -239,29 +238,29 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
         merged = tf.summary.merge_all()
         saver = tf.train.Saver(max_to_keep=100)
 
-    # training session
-    print('----- training start -----')
-    with tf.Session() as sess:
-        sum_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
-        tf.global_variables_initializer().run() # .run() is possible! because of with tf.Session()
-        step = 1
-        while step <= MAX_EPOCH:
-            for batch in range(int(n_train / BATCH_SIZE) + 1):
-                # checkpoint
-                s = batch * BATCH_SIZE
-                e = (batch + 1) * BATCH_SIZE if (batch + 1) * BATCH_SIZE < n_train else n_train
-                batch_xs, batch_ys = next_batch(batch)
-                if e <= s: break
-                _, summary, acc, ent = sess.run([train_op, merged, accuracy, cross_entropy],
-                                                {_X: batch_xs, _Y: batch_ys, p_keep: 0.75})
-                sum_writer.add_summary(summary, step)
-                print('[%6.2f] step:%3d, size:%3d, lr:%f, accuracy:%f, cross entropy:%f'
-                      % (time.time() - start, step, e - s, LR.eval(), acc, ent))
-                if (MAX_EPOCH - step) < 10 or step % 100 == 0:
-                    saver.save(sess, SAVE_MODEL_PATH, global_step=step)
-                step += 1
-                if step > MAX_EPOCH: break
-    print('-----  training end  -----')
+        # training session
+        print('----- training start -----')
+        with tf.Session() as sess:
+            sum_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
+            tf.global_variables_initializer().run() # .run() is possible! because of with tf.Session()
+            step = 1
+            while step <= MAX_EPOCH:
+                for batch in range(int(n_train / BATCH_SIZE) + 1):
+                    # checkpoint
+                    s = batch * BATCH_SIZE
+                    e = (batch + 1) * BATCH_SIZE if (batch + 1) * BATCH_SIZE < n_train else n_train
+                    batch_xs, batch_ys = next_batch(batch)
+                    if e <= s: break
+                    _, summary, acc, ent = sess.run([train_op, merged, accuracy, cross_entropy],
+                                                    {X_: batch_xs, Y_: batch_ys, p_keep: 0.75})
+                    sum_writer.add_summary(summary, step)
+                    print('[%6.2f] step:%3d, size:%3d, lr:%f, accuracy:%f, cross entropy:%f'
+                          % (time.time() - start, step, e - s, LR.eval(), acc, ent))
+                    if (MAX_EPOCH - step) < 10 or step % 100 == 0:
+                        saver.save(sess, SAVE_MODEL_PATH, global_step=step)
+                    step += 1
+                    if step > MAX_EPOCH: break
+        print('-----  training end  -----')
 
 # test session
 def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
@@ -312,10 +311,11 @@ def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
 
 # do train with batch size 60 and maximum step 50
 train, test = readdata.read_train_and_test_data()
+
 SAVE='/home/mike2ox/biometter-classification/train/model/ckpt'
 LOG='/home/mike2ox/biometter-classification/train/log/'
 phase_train(max_epoch, batch_size, SAVE, LOG)
 MODEL='/home/mike2ox/biometter-classification/test/model/ckpt'
 LOG='/home/mike2ox/biometter-classification/test/log'
-phase_test(100,MODEL,LOG)
+phase_test(100, MODEL, LOG)
 
