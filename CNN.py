@@ -230,10 +230,10 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
         Y, cross_entropy, accuracy, _ = cnn_model(_X, _Y, p_keep)
         train_op = tf.train.AdamOptimizer(LR).minimize(cross_entropy, global_step=global_step)
 
-    with tf.variable_scope('Metrics'):
-        tf.summary.scalar('accuracy', accuracy)
-        tf.summary.scalar('cross_entropy', cross_entropy)
-        tf.summary.scalar('learning_rate', LR)
+        with tf.variable_scope('Metrics'):
+            tf.summary.scalar('accuracy', accuracy)
+            tf.summary.scalar('cross_entropy', cross_entropy)
+            tf.summary.scalar('learning_rate', LR)
 
         # set tensorboard summary and saver
         merged = tf.summary.merge_all()
@@ -255,8 +255,8 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
                 _, summary, acc, ent = sess.run([train_op, merged, accuracy, cross_entropy],
                                                 {_X: batch_xs, _Y: batch_ys, p_keep: 0.75})
                 sum_writer.add_summary(summary, step)
-                print(' step:%3d, size:%3d, lr:%f, accuracy:%f, cross entropy:%f'
-                      % (step, e - s, LR.eval(), acc, ent))
+                print('[%6.2f] step:%3d, size:%3d, lr:%f, accuracy:%f, cross entropy:%f'
+                      % (time.time() - start, step, e - s, LR.eval(), acc, ent))
                 if (MAX_EPOCH - step) < 10 or step % 100 == 0:
                     saver.save(sess, SAVE_MODEL_PATH, global_step=step)
                 step += 1
@@ -270,46 +270,45 @@ def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
     # shape of train, test : [total_num, kernel_num, col_size, row_size]
     n_test = len(test['image'])
 
-    with tf.variable_scope("input_data"):
+    with tf.Graph().as_default() as test_g:
         # input : 640*512 pix image, black&white
         # output : 1 = separate, 0 = contact
         _X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='_X')
         _Y = tf.placeholder(tf.float32, [None, 2], name='_Y')
-
         # load inference model
         Y, cross_entropy, accuracy, _ = cnn_model(_X, _Y)
 
-    with tf.variable_scope('Metrics'):
-        tf.summary.scalar('accuracy', accuracy)
-        tf.summary.scalar('cross_entropy', cross_entropy)
+        with tf.variable_scope('Metrics'):
+            tf.summary.scalar('accuracy', accuracy)
+            tf.summary.scalar('cross_entropy', cross_entropy)
 
         # set tensorboard summary and saver
         merged = tf.summary.merge_all()
-        saver = tf.train.Saver(max_to_keep=100)
+        saver = tf.train.Saver()
 
-    print('----- test start -----')
-    with tf.Session() as sess:
-        sum_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
-        tf.global_variables_initializer().run() # .run() is possible! because of with tf.Session()
-        step = 1
-        saver.restore(sess, SAVE_MODEL_PATH)
-        avg_acc = 0
+        print('----- test start -----')
+        with tf.Session() as sess:
+            sum_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
+            tf.global_variables_initializer().run() # .run() is possible! because of with tf.Session()
+
+            saver.restore(sess, SAVE_MODEL_PATH)
+            avg_acc = 0
 
 
-        for step in range(int(n_test / BATCH_SIZE) + 1):
-            # checkpoint
-            s = step * BATCH_SIZE
-            e = (step + 1) * BATCH_SIZE if (step + 1) * BATCH_SIZE < n_test else n_test
-            # batch_xs, batch_ys = next_batch(n_test)
-            if e <= s: break
-            summary, acc, ent = sess.run([merged, accuracy, cross_entropy],
-                                            {_X: n_test['image'][s:e], _Y:  n_test['is_contacted'][s:e]})
-            sum_writer.add_summary(summary, step)
-            avg_acc += acc*(e-s)
-            print(' step:%3d, size:%3d, accuracy:%f, cross entropy:%f'
-                  % (step, e - s, acc, ent))
-
-    print('-----  test end  -----')
+            for step in range(int(n_test / BATCH_SIZE) + 1):
+                # checkpoint
+                s = step * BATCH_SIZE
+                e = (step + 1) * BATCH_SIZE if (step + 1) * BATCH_SIZE < n_test else n_test
+                # batch_xs, batch_ys = next_batch(n_test)
+                if e <= s: break
+                summary, acc, ent = sess.run([merged, accuracy, cross_entropy],
+                                                {_X: n_test['image'][s:e], _Y:  n_test['is_contacted'][s:e]})
+                sum_writer.add_summary(summary, step)
+                avg_acc += acc*(e-s)
+                print('[%6.2f] step:%3d, size:%3d, accuracy:%f, cross entropy:%f'
+                      % (time.time() - start, step+1, e - s, acc, ent))
+        print('-----  test end  -----')
+        print('[%6.2f] total average accuracy : %f' % (time.time()-start, avg_acc/n_test))
 
 # do train with batch size 60 and maximum step 50
 train, test = readdata.read_train_and_test_data()
