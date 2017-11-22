@@ -132,6 +132,7 @@ def train():
 
     with tf.Session() as sess:
         tf.global_variables_initializer().run()
+        train_log.add_graph(sess.graph)
 
         total_batch = len(train_data['image']) // batch_size
 
