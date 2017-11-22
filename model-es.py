@@ -178,6 +178,8 @@ def train():
         xs = np.transpose(xs, (0, 2, 1))
         xs = np.reshape(xs, (-1, 640, 512, 2))
         ys = np.array(ys)
+        ys = np.array(ys).reshape(-1).astype(int)
+        ys = np.eye(2)[ys]
 
         acc = sess.run([accuracy],
                        feed_dict={

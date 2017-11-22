@@ -6,15 +6,19 @@ from data import input_data
 
 train_data, test_data = input_data.read_train_and_test_data()
 
+model_path = './model/lr_0.001_epoch_30_batch_10_1511353388.6777036/'
+
 
 def test():
-
-    saver = tf.train.Saver()
+    tf.reset_default_graph()
+    saver = tf.train.import_meta_graph(model_path + 'acc_1.0.ckpt.meta')
 
     with tf.Session() as sess:
         # test
+        print(tf.train.latest_checkpoint(model_path))
+        saver.restore(sess, tf.train.latest_checkpoint(model_path))
 
-        model = saver.restore('./model/lr_0.0001_epoch_100_batch_10_1511342809.8350415/acc_0.9981.ckpt')
+        print(sess.run('x:0'))
 
         print('Test Start')
         # test data prepocess
@@ -24,11 +28,17 @@ def test():
         xs = np.reshape(xs, (-1, 640, 512, 2))
         ys = np.array(ys)
 
+        X = sess.run('X:0')
+        Y = sess.run('Y:0')
+        keep_prob = sess.run('keep_prob:0')
+
+        accuracy = sess.run('accuracy:1')
+
         acc = sess.run([accuracy],
-                       feed_dict={
+                       {
                            X: xs,
                            Y: ys,
-                           keep_prob: 1
+                           keep_prob: 1.0
                        })
 
         print('TEST ACCURACY: {}'.format(acc))
