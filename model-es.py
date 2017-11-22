@@ -153,7 +153,7 @@ def train():
                 total_loss += loss
 
             train_log.add_summary(summary, epoch)
-            print('epoch: {}, loss: {}'.format(epoch, total_loss / total_batch))
+            print('epoch: {}, loss: {:.4}'.format(epoch, total_loss / total_batch))
 
             if epoch % 5 == 0:
                 xs, ys = next_batch(batch, False)
@@ -165,11 +165,11 @@ def train():
                                             keep_prob: 1})
 
                 test_log.add_summary(summary, epoch)
-                saver.save(sess, model_root+'/acc_{}'.format(acc))
-                print('accuracy: {}'.format(acc))
+                print('accuracy: {:.4}'.format(acc))
 
     print('Finish')
     train_log.close()
+    saver.save(sess, model_root+'/acc_{:.4}'.format(acc))
 
 
 train()
