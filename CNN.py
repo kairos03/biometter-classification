@@ -9,8 +9,15 @@ import data.input_data as readdata
 import time
 import numpy as np
 
-SAVE='D:/KIST/tmp/train/model/ckpt'
-LOG='D:/KIST/tmp/train/log/'
+# kernel depths
+k_1 = 2
+k_2 = 4
+k_3 = 32
+f_node = 512
+
+max_epoch = 50
+batch_size = 30
+
 
 # checkpoint : tf.summary 클래스 input으로 object를 넣어야 하는 이유?
 class Summary(object):
@@ -54,8 +61,8 @@ class ConvLayer(Summary):
         self.w = tf.Variable(tf.truncated_normal(W_shape, stddev=0.1), trainable=True, name='W')
         self._summary('W', self.w)
 
-        if self.act != 'bn':
-            self.B = tf.Variable(tf.constant())
+        # if self.act != 'bn':
+        #    self.B = tf.Variable(tf.constant())
 
     def out(self):
         # basic output
@@ -63,7 +70,7 @@ class ConvLayer(Summary):
 
         # detect activation function
         if self.act == 'relu':
-            return tf.nn.relu(WX + self.B)
+            return tf.nn.relu(WX)
         elif self.act == 'bn':
             return WX
         elif self.act == 'none':
@@ -83,7 +90,7 @@ class FC_Layer(Summary):
         self.act = activation.lower()
 
         # calculate weight, bis
-        self.W = tf.Variable(tf.truncated_normal([n_in, n_out]), stddev=0.1, trainable=True, name='W')
+        self.W = tf.Variable(tf.truncated_normal([n_in, n_out], stddev=0.1), trainable=True, name='W')
         self._summary('W', self.W)
         self.B = tf.Variable(tf.constant(0.0, tf.float32, [n_out]), trainable=True, name='B')
         self._summary('B', self.B)
@@ -146,25 +153,25 @@ def cnn_model(image_array, result, p_keep = None):
         # 2 : front,right image data (black&white)
         # .out() -> activate ReLU function
         # kernel size define reference : http://bit.ly/2jFdBjP
-        step1 = ConvLayer(image_array, k_1, 8, 100, 100, 4, activation='ReLU').out()
+        step1 = ConvLayer(image_array, k_1, k_2, 100, 100, 4, activation='ReLU').out()
 
     with tf.name_scope('MaxPool1'):
         step1 = tf.nn.max_pool(step1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     with tf.variable_scope('Conv2'):
-        step2 = ConvLayer(step1, k_2, 64, 20, 20, 2, activation='ReLU').out()
+        step2 = ConvLayer(step1, k_2, k_3, 20, 20, 4, activation='ReLU').out()
     with tf.name_scope('MaxPool2'):
         step2 = tf.nn.max_pool(step2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     with tf.variable_scope('Conv3'):
-        step3 = ConvLayer(step2, k_3, 1024, 3, 3, 1, activation='ReLu').out()
+        step3 = ConvLayer(step2, k_3, 64, 3, 3, 2, activation='ReLU').out()
     with tf.variable_scope('output'):
-        step4 = tf.reshape(step3, [-1, 20*16*1024])
-        step5 = FC_Layer(step4, 20*16*1024, f_node, activation='ReLu').out()
+        step4 = tf.reshape(step3, [-1, 5*4*64])
+        step5 = FC_Layer(step4, 5*4*64, f_node, activation='ReLU').out()
+        Y = FC_Layer(step5, f_node, 2, activation='ReLU').out()
 
-    Y = tf.nn.softmax(step5, name='Y')
 
     # checkpoint : there need to re-customize
     with tf.variable_scope('cross_entropy'):
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=step5, labels=result)
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=Y, labels=result)
         cross_entropy = tf.reduce_mean(cross_entropy)
 
     with tf.variable_scope('accuracy'):
@@ -198,10 +205,10 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
     start = time.time()
 
     # shape of train, test : [total_num, kernel_num, col_size, row_size]
-    n_train = train[0]
-    n_test = test[0]
+    n_train = len(train['image'])
+    #  n_test = test[0]
 
-    with tf.variable_scope("input data"):
+    with tf.variable_scope("inputdata"):
         # input : 640*512 pix image, black&white
         # output : 1 = separate, 0 = contact
         _X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='_X')
@@ -255,19 +262,60 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
                 if step > MAX_EPOCH: break
     print('-----  training end  -----')
 
+# test session
+def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
+    start = time.time()
+
+    # shape of train, test : [total_num, kernel_num, col_size, row_size]
+    n_test = len(test['image'])
+
+    with tf.variable_scope("input_data"):
+        # input : 640*512 pix image, black&white
+        # output : 1 = separate, 0 = contact
+        _X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='_X')
+        _Y = tf.placeholder(tf.float32, [None, 2], name='_Y')
+
+        # load inference model
+        Y, cross_entropy, accuracy, _ = cnn_model(_X, _Y)
+
+    with tf.variable_scope('Metrics'):
+        tf.summary.scalar('accuracy', accuracy)
+        tf.summary.scalar('cross_entropy', cross_entropy)
+
+        # set tensorboard summary and saver
+        merged = tf.summary.merge_all()
+        saver = tf.train.Saver(max_to_keep=100)
+
+    print('----- test start -----')
+    with tf.Session() as sess:
+        sum_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
+        tf.global_variables_initializer().run() # .run() is possible! because of with tf.Session()
+        step = 1
+        saver.restore(sess, SAVE_MODEL_PATH)
+        avg_acc = 0
 
 
-# kernel depths
-k_1 = 4
-k_2 = 8
-k_3 = 16
-f_node = 512
+        for step in range(int(n_test / BATCH_SIZE) + 1):
+            # checkpoint
+            s = step * BATCH_SIZE
+            e = (step + 1) * BATCH_SIZE if (step + 1) * BATCH_SIZE < n_test else n_test
+            # batch_xs, batch_ys = next_batch(n_test)
+            if e <= s: break
+            summary, acc, ent = sess.run([merged, accuracy, cross_entropy],
+                                            {_X: n_test['image'][s:e], _Y:  n_test['is_contacted'][s:e]})
+            sum_writer.add_summary(summary, step)
+            avg_acc += acc*(e-s)
+            print(' step:%3d, size:%3d, accuracy:%f, cross entropy:%f'
+                  % (step, e - s, acc, ent))
 
-max_epoch = 50
-batch_size = 60
+    print('-----  test end  -----')
 
 # do train with batch size 60 and maximum step 50
-train, test = readdata.make_train_and_test_set()
+train, test = readdata.read_train_and_test_data()
+SAVE='/home/mike2ox/biometter-classification/train/model/ckpt'
+LOG='/home/mike2ox/biometter-classification/train/log/'
 phase_train(max_epoch, batch_size, SAVE, LOG)
-
+MODEL='/home/mike2ox/biometter-classification/test/model/ckpt'
+LOG='/home/mike2ox/biometter-classification/test/log'
+phase_test(100,MODEL,LOG)
 

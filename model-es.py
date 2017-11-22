@@ -152,6 +152,10 @@ def train():
                 total_loss += loss
 
             train_log.add_summary(summary, epoch)
+<<<<<<< HEAD
+            print('epoch: {}, loss: {:.4}'.format(epoch, total_loss / total_batch))
+=======
+>>>>>>> 966595ce68ea0e4fb04e4ea6d47a2d3155a53c0e
 
             print('epoch: {:05}, loss: {:.5}'.format(epoch, total_loss / total_batch))
 
@@ -166,6 +170,8 @@ def train():
 
                 test_log.add_summary(summary, epoch)
                 print('accuracy: {:.4}'.format(acc))
+<<<<<<< HEAD
+=======
 
         saver.save(sess, model_root+'acc_{:.4}.ckpt'.format(acc))
         print('Train Finish')
@@ -189,9 +195,14 @@ def train():
 
         print('TEST ACCURACY: {}'.format(acc))
         print('Test Finish')
+>>>>>>> 966595ce68ea0e4fb04e4ea6d47a2d3155a53c0e
 
     train_log.close()
+<<<<<<< HEAD
+    saver.save(sess, model_root+'/acc_{:.4}'.format(acc))
+=======
     test_log.close()
+>>>>>>> 966595ce68ea0e4fb04e4ea6d47a2d3155a53c0e
 
 
 train()
