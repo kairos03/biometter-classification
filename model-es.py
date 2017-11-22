@@ -17,13 +17,7 @@ model_root = './model/' + name + '/'
 train_data, test_data = input_data.read_train_and_test_data()
 
 
-def one_hot(arr, depth):
-    arr = np.array(arr).reshape(-1).astype(int)
-    hot = np.eye(depth)[arr]
-    return hot
-
-
-def next_batch(batch, is_train=True):
+def next_batch(batch, is_train=True, one_hot=True):
     if is_train:
         xs = train_data['image'][:(batch + 1) * batch_size]
         ys = train_data['is_contacted'][:(batch + 1) * batch_size]
@@ -35,7 +29,11 @@ def next_batch(batch, is_train=True):
     xs = np.transpose(xs, (0, 2, 1))
     xs = np.reshape(xs, (-1, 640, 512, 2))
     ys = np.array(ys)
-    ys = one_hot(ys, 2)
+
+    if one_hot:
+        ys = np.array(ys).reshape(-1).astype(int)
+        ys = np.eye(2)[ys]
+
     return xs, ys
 
 
@@ -74,7 +72,7 @@ def train():
     #     tf.summary.histogram('act', conv0)
 
     with tf.name_scope('conv1'):
-        filter1 = var_weight([10, 8, 2, 16])
+        filter1 = var_weight([10, 10, 2, 16])
         conv1 = tf.nn.conv2d(X, filter1, strides=[1, 10, 8, 1], padding='SAME')
         conv1 = tf.nn.relu(conv1)
         tf.summary.histogram('act', conv1)
@@ -83,7 +81,7 @@ def train():
         pool1 = tf.nn.max_pool(conv1, [1, 2, 2, 1], [1, 2, 2, 1], padding='SAME')
 
     with tf.name_scope('conv2'):
-        filter2 = var_weight([2, 2, 16, 32])
+        filter2 = var_weight([3, 3, 16, 32])
         conv2 = tf.nn.conv2d(pool1, filter2, strides=[1, 2, 2, 1], padding='SAME')
         conv2 = tf.nn.relu(conv2)
         tf.summary.histogram('act', conv2)
@@ -92,7 +90,7 @@ def train():
         pool2 = tf.nn.max_pool(conv2, [1, 2, 2, 1], [1, 2, 2, 1], padding='SAME')
 
     with tf.name_scope('conv3'):
-        filter3 = var_weight([2, 2, 32, 64])
+        filter3 = var_weight([3, 3, 32, 64])
         conv3 = tf.nn.conv2d(pool2, filter3, strides=[1, 2, 2, 1], padding='SAME')
         conv3 = tf.nn.relu(conv3)
         tf.summary.histogram('act', conv3)
@@ -153,10 +151,11 @@ def train():
                 total_loss += loss
 
             train_log.add_summary(summary, epoch)
-            print('epoch: {}, loss: {:.4}'.format(epoch, total_loss / total_batch))
 
-            if epoch % 5 == 0:
-                xs, ys = next_batch(batch, False)
+            print('epoch: {:05}, loss: {:.5}'.format(epoch, total_loss / total_batch))
+
+            if epoch % 5 == 4:
+                xs, ys = next_batch(None, False)
 
                 summary, acc = sess.run([merged, accuracy],
                                         feed_dict={
@@ -167,9 +166,31 @@ def train():
                 test_log.add_summary(summary, epoch)
                 print('accuracy: {:.4}'.format(acc))
 
-        saver.save(sess, model_root+'acc_{:.4}'.format(acc))
-    print('Finish')
+        saver.save(sess, model_root+'acc_{:.4}.ckpt'.format(acc))
+        print('Train Finish')
+
+        # test
+        print('Test Start')
+        # test data prepocess
+        data = np.concatenate((train_data, test_data))
+        xs = data['image'][:]
+        ys = data['is_contacted'][:]
+        xs = np.transpose(xs, (0, 2, 1))
+        xs = np.reshape(xs, (-1, 640, 512, 2))
+        ys = np.array(ys)
+
+        acc = sess.run([accuracy],
+                       feed_dict={
+                           X: xs,
+                           Y: ys,
+                           keep_prob: 1
+                       })
+
+        print('TEST ACCURACY: {}'.format(acc))
+        print('Test Finish')
+
     train_log.close()
+    test_log.close()
 
 
 train()
