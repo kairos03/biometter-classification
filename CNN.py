@@ -245,7 +245,6 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
         sum_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
         tf.global_variables_initializer().run() # .run() is possible! because of with tf.Session()
         step = 1
-
         while step <= MAX_EPOCH:
             for batch in range(int(n_train / BATCH_SIZE) + 1):
                 # checkpoint
