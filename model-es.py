@@ -5,8 +5,8 @@ import time
 from data import input_data
 import numpy as np
 
-learning_rate = 1e-4
-total_epoch = 100
+learning_rate = 1e-3
+total_epoch = 30
 batch_size = 10
 dropout_keep_prob = 0.9
 
@@ -39,8 +39,8 @@ def next_batch(batch, is_train=True, one_hot=True):
 
 def train():
     with tf.name_scope('input'):
-        X = tf.placeholder(tf.float32, [None, 640, 512, 2])
-        Y = tf.placeholder(tf.float32, [None, 2])
+        X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='X')
+        Y = tf.placeholder(tf.float32, [None, 2], name='Y')
         keep_prob = tf.placeholder(tf.float32)
 
     #
@@ -118,12 +118,12 @@ def train():
 
     #
     with tf.name_scope('matrix'):
-        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=model, labels=Y))
-        optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cost)
-        accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(model, 1), tf.argmax(Y, 1)), tf.float32))
+        xent = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=model, labels=Y), name='xent')
+        optimizer = tf.train.AdamOptimizer(learning_rate).minimize(xent)
+        accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(model, 1), tf.argmax(Y, 1)), tf.float32), name='accuracy')
 
         tf.summary.scalar('accuracy', accuracy)
-        tf.summary.scalar('xent', cost)
+        tf.summary.scalar('xent', xent)
 
     train_log = tf.summary.FileWriter(log_root+'train'.format(learning_rate, time.time()))
     test_log = tf.summary.FileWriter(log_root+'test'.format(learning_rate, time.time()))
@@ -144,7 +144,7 @@ def train():
             for batch in range(total_batch):
                 xs, ys = next_batch(batch)
 
-                summary, loss, _ = sess.run([merged, cost, optimizer],
+                summary, loss, _ = sess.run([merged, xent, optimizer],
                                             feed_dict={
                                                 X: xs,
                                                 Y: ys,
@@ -155,7 +155,7 @@ def train():
 
             print('epoch: {:05}, loss: {:.5}'.format(epoch, total_loss / total_batch))
 
-            if epoch % 5 == 4:
+            if epoch == 0 or epoch % 5 == 4:
                 xs, ys = next_batch(None, False)
 
                 summary, acc = sess.run([merged, accuracy],
@@ -173,9 +173,8 @@ def train():
         # test
         print('Test Start')
         # test data prepocess
-        data = np.concatenate((train_data, test_data))
-        xs = data['image'][:]
-        ys = data['is_contacted'][:]
+        xs = np.concatenate((train_data['image'][:], test_data['image'][:]))
+        ys = np.concatenate((train_data['is_contacted'][:], test_data['is_contacted'][:]))
         xs = np.transpose(xs, (0, 2, 1))
         xs = np.reshape(xs, (-1, 640, 512, 2))
         ys = np.array(ys)
