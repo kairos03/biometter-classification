@@ -109,12 +109,12 @@ def train():
         tf.summary.histogram('act', fc1)
 
     with tf.name_scope('dropout'):
-        tf.nn.dropout(fc1, keep_prob)
+        droped = tf.nn.dropout(fc1, keep_prob)
 
     with tf.name_scope('fc2'):
         weight2 = var_weight([512, 2])
         # bias2 = var_bias([2])
-        model = tf.matmul(fc1, weight2)  # + bias2
+        model = tf.matmul(droped, weight2)  # + bias2
 
     #
     with tf.name_scope('matrix'):
