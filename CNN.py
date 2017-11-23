@@ -154,12 +154,12 @@ def cnn_model(image_array, result, p_keep = None):
         # 2 : front,right image data (black&white)
         # .out() -> activate ReLU function
         # kernel size define reference : http://bit.ly/2jFdBjP
-        step1 = ConvLayer(image_array, k_1, k_2, 100, 100, 4, activation='ReLU').out()
+        step1 = ConvLayer(image_array, k_1, k_2, 50, 50, 4, activation='ReLU').out()
 
     with tf.name_scope('MaxPool1'):
         step1 = tf.nn.max_pool(step1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     with tf.variable_scope('Conv2'):
-        step2 = ConvLayer(step1, k_2, k_3, 20, 20, 4, activation='ReLU').out()
+        step2 = ConvLayer(step1, k_2, k_3, 10, 10, 4, activation='ReLU').out()
     with tf.name_scope('MaxPool2'):
         step2 = tf.nn.max_pool(step2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
     with tf.variable_scope('Conv3'):
@@ -169,7 +169,7 @@ def cnn_model(image_array, result, p_keep = None):
     with tf.variable_scope('output'):
         step5 = FC_Layer(step4, 5*4*64, f_node, activation='ReLU').out()
         if train_step: step5 = tf.nn.dropout(step5, p_keep)
-        step6 = FC_Layer(step5, f_node, 2, activation='ReLU').out()
+        step6 = FC_Layer(step5, f_node, 2).out()
         if train_step: Y = tf.nn.dropout(step6, p_keep, name='Y')
 
     # checkpoint : there need to re-customize
