@@ -69,18 +69,23 @@ class FullConnectedLayer(BasicLayer):
         return fc
 
 
-def make_model(X, Y, keep_prob):
+def make_model():
     """make model
-        Args:
+        Returns:
             X: input image place holder
             Y: input label place holder
             keep_prob: drop out parameter place holder
-        Returns:
             model: predict model
             xent: cross entropy operation
             optimizer: optimizer operation
             accuracy: accuracy operation
     """
+    # input
+    with tf.name_scope('input'):
+        X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='X')
+        Y = tf.placeholder(tf.float32, [None, 2], name='Y')
+        keep_prob = tf.placeholder(tf.float32)
+
     # layers
     with tf.name_scope('conv1'):
         conv1 = Conv2dLayer(X, [10, 10, 2, 16], strides=[1, 10, 8, 1], padding='SAME').make_layer()
@@ -118,7 +123,7 @@ def make_model(X, Y, keep_prob):
         tf.summary.scalar('accuracy', accuracy)
         tf.summary.scalar('xent', xent)
 
-    return model, xent, optimizer, accuracy
+    return X, Y, keep_prob, model, xent, optimizer, accuracy
 
 
 def do_train(validation_epoch):
@@ -127,14 +132,8 @@ def do_train(validation_epoch):
             validation_epoch: validation epoch to train step
     """
 
-    # input
-    with tf.name_scope('input'):
-        X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='X')
-        Y = tf.placeholder(tf.float32, [None, 2], name='Y')
-        keep_prob = tf.placeholder(tf.float32)
-
     # get model and op
-    model, xent, optimizer, accuracy = make_model(X, Y, keep_prob)
+    model, xent, optimizer, accuracy = make_model()
 
     # data load
     train_data, test_data = input_data.read_cross_validation_data_set(validation_epoch)
@@ -189,7 +188,7 @@ def do_train(validation_epoch):
             summary = None
 
             # train data shuffle
-            train_data, test_data = input_data.read_cross_validation_data_set(validation_epoch)
+            X, Y, keep_prob, train_data, test_data = input_data.read_cross_validation_data_set(validation_epoch)
 
             # batch
             for batch in range(total_batch):
@@ -230,19 +229,19 @@ def do_train(validation_epoch):
         ys = np.eye(2)[ys]
 
         # run test
-        acc = sess.run([accuracy],
+        acc = sess.run(accuracy,
                        feed_dict={
                            X: xs,
                            Y: ys,
                            keep_prob: 1
                        })
 
-        print('TEST ACCURACY: {:.5}'.format(acc[0]))
+        print('TEST ACCURACY: {:.5}'.format(acc))
 
     train_log.close()
     test_log.close()
 
-    return acc[0]
+    return acc
 
 
 def cross_validation():
