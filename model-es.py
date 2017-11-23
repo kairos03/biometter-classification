@@ -125,7 +125,7 @@ def train():
 
     # Crosss Validation Training
     for validation_epoch in range(5):
-        print('Validation Set {}'.format(validation_epoch))
+        print('\nValidation Set {}'.format(validation_epoch))
         # data load
         train_data, test_data = input_data.read_cross_validation_data_set(validation_epoch)
 
@@ -209,7 +209,6 @@ def train():
             print('Train Finish')
 
             # test
-            print('Test Start')
             # test data prepocess
             xs = np.concatenate((train_data['image'][:], test_data['image'][:]))
             ys = np.concatenate((train_data['is_contacted'][:], test_data['is_contacted'][:]))
@@ -227,7 +226,6 @@ def train():
             v_acc += acc[0]
 
             print('TEST ACCURACY: {:.5}'.format(acc[0]))
-            print('Test Finish')
 
         train_log.close()
         test_log.close()
