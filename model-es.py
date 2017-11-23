@@ -7,8 +7,8 @@ import numpy as np
 
 # hyper parameter
 learning_rate = 1e-3
-total_epoch = 5
-batch_size = 10
+total_epoch = 50
+batch_size = 30
 dropout_keep_prob = 0.9
 
 # name, log, model path setting
@@ -226,14 +226,14 @@ def train():
 
             v_acc += acc[0]
 
-            print('TEST ACCURACY: {}'.format(acc[0]))
+            print('TEST ACCURACY: {:.5}'.format(acc[0]))
             print('Test Finish')
 
         train_log.close()
         test_log.close()
 
     print('Finish')
-    print('Final AVG ACCURACY {}'.format(v_acc/5))
+    print('Final AVG ACCURACY {:.5}'.format(v_acc/5))
 
 
 train()
