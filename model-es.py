@@ -17,7 +17,7 @@ log_root = './log/' + name + '/'
 model_root = './model/' + name + '/'
 
 # data load
-train_data, test_data = input_data.read_train_and_test_data()
+train_data, test_data = input_data.read_cross_validation_data_set(0)
 
 
 def next_batch(batch, is_train=True, one_hot=True):
@@ -40,8 +40,6 @@ def next_batch(batch, is_train=True, one_hot=True):
         ys = train_data['is_contacted'][:]
 
     # reform data
-    xs = np.transpose(xs, (0, 2, 1))
-    xs = np.reshape(xs, (-1, 640, 512, 2))
     ys = np.array(ys)
 
     # one hot encoding
@@ -50,6 +48,7 @@ def next_batch(batch, is_train=True, one_hot=True):
         ys = np.eye(2)[ys]
 
     return xs, ys
+
 
 class BasicLayer:
     def var_summary(self, name, var):
@@ -153,76 +152,91 @@ def train():
         tf.summary.scalar('accuracy', accuracy)
         tf.summary.scalar('xent', xent)
 
-    # summary setting
-    train_log = tf.summary.FileWriter(log_root+'train'.format(learning_rate, time.time()))
-    test_log = tf.summary.FileWriter(log_root+'test'.format(learning_rate, time.time()))
-    merged = tf.summary.merge_all()
-    saver = tf.train.Saver()
+    # Train Start
+    print('Start')
+    v_acc = 0
 
-    # train session
-    with tf.Session() as sess:
-        tf.global_variables_initializer().run()
-        train_log.add_graph(sess.graph)
+    # Crosss Validation Training
+    for validation_epoch in range(5):
+        print('Validation Set {}')
 
-        total_batch = len(train_data['image']) // batch_size
+        # summary setting
+        train_log = tf.summary.FileWriter(log_root+'train'.format(learning_rate, time.time()))
+        test_log = tf.summary.FileWriter(log_root+'test'.format(learning_rate, time.time()))
+        merged = tf.summary.merge_all()
+        saver = tf.train.Saver()
 
-        print('Train Start')
-        for epoch in range(total_epoch):
-            total_loss = 0
-            summary = None
+        # train session
+        with tf.Session() as sess:
+            tf.global_variables_initializer().run()
+            train_log.add_graph(sess.graph)
 
-            for batch in range(total_batch):
-                xs, ys = next_batch(batch)
+            total_batch = len(train_data['image']) // batch_size
 
-                summary, loss, _ = sess.run([merged, xent, optimizer],
+            print('Train Start')
+            for epoch in range(total_epoch):
+                total_loss = 0
+                summary = None
+
+                # train data shuffle
+                train_data, test_data = input_data.read_cross_validation_data_set(validation_epoch)
+
+                for batch in range(total_batch):
+                    xs, ys = next_batch(batch)
+
+                    summary, loss, acc, _ = sess.run([merged, xent, accuracy, optimizer],
+                                                feed_dict={
+                                                    X: xs,
+                                                    Y: ys,
+                                                    keep_prob: dropout_keep_prob})
+                    total_loss += loss
+
+                train_log.add_summary(summary, epoch)
+                avg_loss = total_loss / total_batch
+                print('epoch: {:05}, loss: {:.5}, acc: {:.5}'.format(epoch, avg_loss, acc))
+
+                if epoch == 0 or epoch % 5 == 4:
+                    xs, ys = next_batch(None, False)
+
+                    summary, acc = sess.run([merged, accuracy],
                                             feed_dict={
                                                 X: xs,
                                                 Y: ys,
-                                                keep_prob: dropout_keep_prob})
-                total_loss += loss
+                                                keep_prob: 1})
 
-            train_log.add_summary(summary, epoch)
+                    test_log.add_summary(summary, epoch)
+                    print('accuracy: {:.4}'.format(acc))
 
-            print('epoch: {:05}, loss: {:.5}'.format(epoch, total_loss / total_batch))
+            saver.save(sess, model_root+'acc_{:.4}.ckpt'.format(acc))
+            print('Train Finish')
 
-            if epoch == 0 or epoch % 5 == 4:
-                xs, ys = next_batch(None, False)
+            # test
+            print('Test Start')
+            # test data prepocess
+            xs = np.concatenate((train_data['image'][:], test_data['image'][:]))
+            ys = np.concatenate((train_data['is_contacted'][:], test_data['is_contacted'][:]))
+            ys = np.array(ys)
+            ys = np.array(ys).reshape(-1).astype(int)
+            ys = np.eye(2)[ys]
 
-                summary, acc = sess.run([merged, accuracy],
-                                        feed_dict={
-                                            X: xs,
-                                            Y: ys,
-                                            keep_prob: 1})
+            acc = sess.run([accuracy],
+                           feed_dict={
+                               X: xs,
+                               Y: ys,
+                               keep_prob: 1
+                           })
 
-                test_log.add_summary(summary, epoch)
-                print('accuracy: {:.4}'.format(acc))
+            v_acc += acc[0]
 
-        saver.save(sess, model_root+'acc_{:.4}.ckpt'.format(acc))
-        print('Train Finish')
+            print('TEST ACCURACY: {}'.format(acc[0]))
+            print('Test Finish')
 
-        # test
-        print('Test Start')
-        # test data prepocess
-        xs = np.concatenate((train_data['image'][:], test_data['image'][:]))
-        ys = np.concatenate((train_data['is_contacted'][:], test_data['is_contacted'][:]))
-        xs = np.transpose(xs, (0, 2, 1))
-        xs = np.reshape(xs, (-1, 640, 512, 2))
-        ys = np.array(ys)
-        ys = np.array(ys).reshape(-1).astype(int)
-        ys = np.eye(2)[ys]
+        train_log.close()
+        test_log.close()
 
-        acc = sess.run([accuracy],
-                       feed_dict={
-                           X: xs,
-                           Y: ys,
-                           keep_prob: 1
-                       })
+    print('Finish')
+    print('Final AVG ACCURACY {}'.format(v_acc/5))
 
-        print('TEST ACCURACY: {}'.format(acc))
-        print('Test Finish')
-
-    train_log.close()
-    test_log.close()
 
 train()
 
