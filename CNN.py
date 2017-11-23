@@ -172,9 +172,10 @@ def cnn_model(image_array, result, p_keep = None):
         step6 = FC_Layer(step5, f_node, 2).out()
         if train_step: Y = tf.nn.dropout(step6, p_keep, name='Y')
 
+
     # checkpoint : there need to re-customize
     with tf.variable_scope('cross_entropy'):
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=Y, labels=result)
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=step6, labels=result)
         cross_entropy = tf.reduce_mean(cross_entropy)
 
     with tf.variable_scope('accuracy'):
