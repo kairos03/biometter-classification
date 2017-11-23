@@ -180,9 +180,9 @@ def cnn_model(image_array, result, p_keep = None):
     with tf.variable_scope('accuracy'):
         correct_prediction = tf.equal(tf.argmax(Y, 1), tf.argmax(result, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-        incorrects = tf.squeeze(tf.where(tf.logical_not(correct_prediction)), [1])
+        # incorrects = tf.squeeze(tf.where(tf.logical_not(correct_prediction)), [1])
 
-    return Y, cross_entropy, accuracy, incorrects
+    return Y, cross_entropy, accuracy
 
 # checkpoint
 def one_hot(arr, depth):
@@ -226,7 +226,7 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
             LR = tf.train.exponential_decay(0.001, global_step, int(MAX_EPOCH / 5), 0.5, staircase=True, name='LR')
 
         # load inference model
-        Y, cross_entropy, accuracy, _ = cnn_model(X_, Y_, p_keep)
+        Y, cross_entropy, accuracy = cnn_model(X_, Y_, p_keep)
         train_op = tf.train.AdamOptimizer(LR).minimize(cross_entropy, global_step=global_step)
 
         with tf.variable_scope('Metrics'):
@@ -268,14 +268,14 @@ def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
 
     # shape of train, test : [total_num, kernel_num, col_size, row_size]
     n_test = len(test['image'])
+    # input : 640*512 pix image, black&white
+    # output : 1 = separate, 0 = contact
+    X_ = tf.placeholder(tf.float32, [None, 640, 512, 2], name='X_')
+    Y_ = tf.placeholder(tf.float32, [None, 2], name='Y_')
 
     with tf.Graph().as_default() as test_g:
-        # input : 640*512 pix image, black&white
-        # output : 1 = separate, 0 = contact
-        _X = tf.placeholder(tf.float32, [None, 640, 512, 2], name='_X')
-        _Y = tf.placeholder(tf.float32, [None, 2], name='_Y')
         # load inference model
-        Y, cross_entropy, accuracy, _ = cnn_model(_X, _Y)
+        Y, cross_entropy, accuracy = cnn_model(X_, Y_)
 
         with tf.variable_scope('Metrics'):
             tf.summary.scalar('accuracy', accuracy)
@@ -301,7 +301,7 @@ def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
                 # batch_xs, batch_ys = next_batch(n_test)
                 if e <= s: break
                 summary, acc, ent = sess.run([merged, accuracy, cross_entropy],
-                                                {_X: n_test['image'][s:e], _Y:  n_test['is_contacted'][s:e]})
+                                                {X_: n_test['image'][s:e], Y_:  n_test['is_contacted'][s:e]})
                 sum_writer.add_summary(summary, step)
                 avg_acc += acc*(e-s)
                 print('[%6.2f] step:%3d, size:%3d, accuracy:%f, cross entropy:%f'
