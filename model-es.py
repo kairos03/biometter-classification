@@ -130,8 +130,8 @@ def train():
         train_data, test_data = input_data.read_cross_validation_data_set(validation_epoch)
 
         # summary setting
-        train_log = tf.summary.FileWriter(log_root+'train'.format(learning_rate, time.time()))
-        test_log = tf.summary.FileWriter(log_root+'test'.format(learning_rate, time.time()))
+        train_log = tf.summary.FileWriter(log_root+'train{}'.format(validation_epoch))
+        test_log = tf.summary.FileWriter(log_root+'test{}'.format(validation_epoch))
         merged = tf.summary.merge_all()
         saver = tf.train.Saver()
 
