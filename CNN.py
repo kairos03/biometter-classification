@@ -241,7 +241,7 @@ def phase_train(MAX_EPOCH, BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
         # training session
         print('----- training start -----')
         with tf.Session() as sess:
-            sum_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
+            sum_writer = tf.summary.FileWriter(LOG_PATH + "LR3e-1/50_50_4/10_10_4/3_3_2", sess.graph)
             tf.global_variables_initializer().run() # .run() is possible! because of with tf.Session()
             step = 1
             while step <= MAX_EPOCH:
@@ -287,7 +287,7 @@ def phase_test(BATCH_SIZE, SAVE_MODEL_PATH, LOG_PATH):
 
         print('----- test start -----')
         with tf.Session() as sess:
-            sum_writer = tf.summary.FileWriter(LOG_PATH, sess.graph)
+            sum_writer = tf.summary.FileWriter(LOG_PATH + "LR3e-1/50_50_4/10_10_4/3_3_2", sess.graph)
             tf.global_variables_initializer().run() # .run() is possible! because of with tf.Session()
 
             saver.restore(sess, SAVE_MODEL_PATH)
@@ -316,6 +316,6 @@ SAVE='/home/mike2ox/biometter-classification/train/model/ckpt'
 LOG='/home/mike2ox/biometter-classification/train/log/'
 phase_train(max_epoch, batch_size, SAVE, LOG)
 MODEL='/home/mike2ox/biometter-classification/test/model/ckpt'
-LOG='/home/mike2ox/biometter-classification/test/log'
+LOG='/home/mike2ox/biometter-classification/test/log/'
 phase_test(100, MODEL, LOG)
 
