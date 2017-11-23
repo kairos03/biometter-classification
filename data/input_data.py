@@ -119,8 +119,13 @@ def make_cross_validation_data_set(ratio=0.2, to_pickle=False):
     return train, test
 
 
-def read_whole_data():
-    return pd.read_pickle(data_path+'/input_data.pkl', compression='gzip')
+def read_whole_data(to_dict=False):
+    data = pd.read_pickle(data_path+'/input_data.pkl', compression='gzip')
+
+    if to_dict:
+        data = data.to_dict('list')
+
+    return data
 
 
 def read_train_and_test_data():
