@@ -16,39 +16,6 @@ name = 'lr_{}_epoch_{}_batch_{}_{}'.format(learning_rate, total_epoch, batch_siz
 log_root = './log/' + name + '/'
 model_root = './model/' + name + '/'
 
-# data load
-train_data, test_data = input_data.read_cross_validation_data_set(0)
-
-
-def next_batch(batch, is_train=True, one_hot=True):
-    """ get next batch
-        Args:
-            batch: current batch iteration, int
-            is_train: if False return Test data, default True
-            one_hot: if True return one hot encoded data, default True
-        Returns:
-            xs: image data
-            ys: label data
-    """
-    # select data
-    if is_train:
-        xs = train_data['image'][:(batch + 1) * batch_size]
-        ys = train_data['is_contacted'][:(batch + 1) * batch_size]
-
-    else:
-        xs = train_data['image'][:]
-        ys = train_data['is_contacted'][:]
-
-    # reform data
-    ys = np.array(ys)
-
-    # one hot encoding
-    if one_hot:
-        ys = np.array(ys).reshape(-1).astype(int)
-        ys = np.eye(2)[ys]
-
-    return xs, ys
-
 
 class BasicLayer:
     def var_summary(self, name, var):
@@ -112,8 +79,8 @@ def train():
         keep_prob = tf.placeholder(tf.float32)
 
     # input image summary
-    with tf.name_scope('input_image'):
-        tf.summary.image('input', X, 10)
+    # with tf.name_scope('input_image'):
+    #     tf.summary.image('input', X, 10)
 
     # layers
     with tf.name_scope('conv1'):
@@ -129,19 +96,19 @@ def train():
         pool2 = tf.nn.max_pool(conv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
     with tf.name_scope('conv3'):
-        conv3 = Conv2dLayer(pool2, [3, 3, 32, 64], strides=[1, 2, 2, 1], padding='SAME')
+        conv3 = Conv2dLayer(pool2, [3, 3, 32, 64], strides=[1, 2, 2, 1], padding='SAME').make_layer()
 
     with tf.name_scope('reshape'):
         reshaped = tf.reshape(conv3, [-1, 4 * 4 * 64])
 
     with tf.name_scope('fc1'):
-        fc1 = FullConnectedLayer(reshaped, 4 * 4 * 64, 512)
+        fc1 = FullConnectedLayer(reshaped, 4 * 4 * 64, 512).make_layer()
 
     with tf.name_scope('dropout'):
         droped = tf.nn.dropout(fc1, keep_prob)
 
     with tf.name_scope('fc2'):
-        model = FullConnectedLayer(droped, 512, 2, activation=tf.identity)
+        model = FullConnectedLayer(droped, 512, 2, activation=tf.identity).make_layer()
 
     # matrix define
     with tf.name_scope('matrix'):
@@ -158,13 +125,44 @@ def train():
 
     # Crosss Validation Training
     for validation_epoch in range(5):
-        print('Validation Set {}')
+        print('Validation Set {}'.format(validation_epoch))
+        # data load
+        train_data, test_data = input_data.read_cross_validation_data_set(validation_epoch)
 
         # summary setting
         train_log = tf.summary.FileWriter(log_root+'train'.format(learning_rate, time.time()))
         test_log = tf.summary.FileWriter(log_root+'test'.format(learning_rate, time.time()))
         merged = tf.summary.merge_all()
         saver = tf.train.Saver()
+
+        def next_batch(batch, is_train=True, one_hot=True):
+            """ get next batch
+                Args:
+                    batch: current batch iteration, int
+                    is_train: if False return Test data, default True
+                    one_hot: if True return one hot encoded data, default True
+                Returns:
+                    xs: image data
+                    ys: label data
+            """
+            # select data
+            if is_train:
+                xs = train_data['image'][:(batch + 1) * batch_size]
+                ys = train_data['is_contacted'][:(batch + 1) * batch_size]
+
+            else:
+                xs = train_data['image'][:]
+                ys = train_data['is_contacted'][:]
+
+            # reform data
+            ys = np.array(ys)
+
+            # one hot encoding
+            if one_hot:
+                ys = np.array(ys).reshape(-1).astype(int)
+                ys = np.eye(2)[ys]
+
+            return xs, ys
 
         # train session
         with tf.Session() as sess:
