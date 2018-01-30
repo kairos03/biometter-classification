@@ -186,6 +186,5 @@ def main():
     print(read_cross_validation_data_set(3))
     print(read_cross_validation_data_set(4))
 
-
 if __name__ == '__main__':
     main()
