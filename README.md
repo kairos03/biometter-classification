@@ -1,5 +1,7 @@
 # Biometter-Classification
 
+**THIS REPO IS NOT GOOD FOR CNN REFERENCE**
+
 ## module
 ### data/input_data
 #### read_whole_data
